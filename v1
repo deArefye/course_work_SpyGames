@@ -1,0 +1,98 @@
+import requests
+import json
+import time
+
+
+try:
+  user_id = 171691064
+
+  TOKEN = '73eaea320bdc0d3299faa475c196cfea1c4df9da4c6d291633f9fe8f83c08c4de2a3abf89fbc3ed8a44e1'
+  
+  params = {
+    'access_token': TOKEN,
+    'v': 5.103,
+    'user_id': user_id,
+    'extended': 1
+    }
+
+  users_group_list = []  # в эту переменную будем складывать группы, в которых есть только пользователь
+    
+  all_friends_group_list = [] # в эту переменную будем складывать группы всех друзей
+    
+  # Получаем список групп пользователя
+  response = requests.get('https://api.vk.com/method/groups.get', params)
+  all_users_group_list = []
+  all_users_group_dict = response.json()['response']['items']
+  
+  for group in all_users_group_dict:
+    all_users_group_list.append(group['id'])
+
+
+  # Получаем список друзей пользователя
+  response_friends_list = requests.get('https://api.vk.com/method/friends.get', params)
+  users_friends_list = []
+  users_friends_dict = response_friends_list.json()['response']['items']
+    
+  for friend in users_friends_dict:
+    users_friends_list.append(friend)
+    
+  # Проверяем группы каждого друга на совпадение с группами пользователя
+  all_friends_group_list = []
+  for i in users_friends_list:
+    params2 = {'access_token': TOKEN, 'v': 5.103, 'user_id': i}
+    friend_group_list = []
+    friend_group_dict = requests.get(
+      'https://api.vk.com/method/groups.get', params2)
+
+    if friend_group_dict.json().get('error'):
+      print(
+            f'Статус: Аккаунт пользователь с id {i} удален или заблокирован'
+            )
+    else:
+      all_friends_group_list.extend(
+      friend_group_dict.json()['response']['items'])
+      print(f'Статус: Обрабатываю информацию по пользователю с id {i}')
+      time.sleep(0.3)
+
+    # Сравниваем группы пользователя с группами его друзей
+  for group in all_users_group_list:
+    if group not in all_friends_group_list:
+      users_group_list.append(group)
+
+  print(
+        f'\nCписок id групп, в которых состоит только интересующий вас пользователь и никто из ее друзей : {users_group_list}'
+    )
+  print('* * * * * * * * * * * * * * * * * * * * * *')
+
+  # Получаем детальную информацию о группах, в которых только пользователь
+  unique_group_dict = {}
+  users_group_list2 = []
+  
+  for unique_group in users_group_list:
+    params3 = {
+      'access_token': TOKEN,
+      'v': 5.103,
+      'group_id': unique_group,
+      'fields': 'members_count'
+      }
+    
+    unique_group_request = requests.get(
+      'https://api.vk.com/method/groups.getById', params3)
+    unique_group_info = unique_group_request.json()['response']
+
+    #сохраняем инфо о группах в переменную
+    unique_group_dict['gid'] = unique_group_info[0]['id']
+    unique_group_dict['name'] = unique_group_info[0]['name']
+    unique_group_dict['members_count'] = unique_group_info[0]['members_count']
+    users_group_list2.append(unique_group_dict)
+    time.sleep(0.3)
+
+  #Создаем файл с информацией о группах, в которых состоит только пользователь
+  with open("no_friends_groups.json", "w") as write_file:
+    json.dump(users_group_list2, write_file)
+
+
+  print('Выполнение программы успешно завершенно. С информацией о группах можете ознакомиться в файле "no_friends_groups.json"')
+
+except Exception:
+    print('Ой, возникли какие-то неполадки. Извините!')
